@@ -1,6 +1,8 @@
+from typing import Self
+
 import boto3
-import os
 import botocore
+import os
 from botocore import exceptions
 
 region = os.getenv("AWS_REGION")
@@ -9,6 +11,35 @@ bucket_name = os.getenv("AWS_BUCKET_NAME")
 s3 = boto3.resource('s3', region_name=region)
 s3_client = boto3.client('s3', region_name=region)
 bucket = s3.Bucket(bucket_name)
+
+
+class S3Key:
+    def __init__(self, path: str) -> None:
+        self.path = path
+
+    @property
+    def parts(self) -> list[str]:
+        return self.path.strip('/').split('/')
+
+    @property
+    def parent(self) -> 'S3Directory | None':
+        if self.parts:
+            return S3Directory('/'.join(self.parts[:-1]) + '/' if len(self.parts) > 1 else '')
+        return None
+
+    def __str__(self) -> str:
+        return self.path
+
+
+class S3Directory(S3Key):
+    def list(self) -> list[S3Key]:
+        # TODO :)
+        raise NotImplementedError
+
+
+class S3File(S3Key):
+    pass
+
 
 def list_s3_objects(prefix=''):
     response = s3_client.list_objects_v2(
@@ -36,8 +67,8 @@ def list_s3_objects(prefix=''):
     return folders, files
 
 
-
-def upload_file(local_path, stocking_folder): #local_path = là où se trouve le fichier à upload et stocking_folder = là où il faut le stocker
+def upload_file(local_path,
+                stocking_folder):  # local_path = là où se trouve le fichier à upload et stocking_folder = là où il faut le stocker
     filename = os.path.basename(local_path)
     stocking_path = f"{stocking_folder}/{filename}"
 
@@ -48,11 +79,11 @@ def upload_file(local_path, stocking_folder): #local_path = là où se trouve le
         return False, f"Erreur : {e}"
 
 
-def download_file(key, filename): #key = chemin du fichier à download et filename = où le stocker
+def download_file(key, filename):  # key = chemin du fichier à download et filename = où le stocker
 
     try:
-            bucket.download_file(key, filename)
-            return True, "Le fichier a été téléchargé avec succès !"
+        bucket.download_file(key, filename)
+        return True, "Le fichier a été téléchargé avec succès !"
     except Exception as e:
         return False, f"Erreur lors du téléchargement : {e}"
 
@@ -91,14 +122,12 @@ def remove(key):
         return False, f"Erreur lors de la suppression : {e}"
 
 
-
-
 def copy(source_key, dest_key):
     try:
         if source_key.endswith('/'):  # parce que les dossiers finissent en /
             objects_to_copy = list(bucket.objects.filter(Prefix=source_key))  # sourceKey + /
             if not objects_to_copy:
-                return  "Aucun objet trouvé à ce chemin source."
+                return "Aucun objet trouvé à ce chemin source."
 
             for obj in objects_to_copy:
                 new_key = dest_key + obj.key[len(source_key):]

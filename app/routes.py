@@ -6,25 +6,26 @@ bp = Blueprint('main', __name__)
 @bp.route('/')
 def index():
     prefix = request.args.get('prefix', '')  # récupère le dossier actuel
+    key = S3Directory(prefix)
     folders, files = list_s3_objects(prefix)
 
-    # Pour la navigation "retour"
-    if prefix:
-        parts = prefix.strip('/').split('/') #enlève les / de début et de fin et permet de sectionner les différents éléments en une liste d'éléments (chemin)
-        parent_prefix = '/'.join(parts[:-1]) + '/' if len(parts) > 1 else ''
+    # # Pour la navigation "retour"
+    # if prefix:
+    #     parts = prefix.strip('/').split('/') #enlève les / de début et de fin et permet de sectionner les différents éléments en une liste d'éléments (chemin)
+    #     parent_prefix = '/'.join(parts[:-1]) + '/' if len(parts) > 1 else ''
+    #
+    #     # parts[:-1] prend tous les éléments sauf le dernier (le dossier courant)
+    #
+    #     # '/'.join(...) recrée un chemin
+    #
+    #     # On ajoute / à la fin pour que le préfixe reste correct pour S3
+    #
+    #     # Si on est tout en haut (prefix = 'dossier/'), on revient à la racine ('')
+    #
+    # else:
+    #     parent_prefix = None
 
-        # parts[:-1] prend tous les éléments sauf le dernier (le dossier courant)
-
-        # '/'.join(...) recrée un chemin
-
-        # On ajoute / à la fin pour que le préfixe reste correct pour S3
-
-        # Si on est tout en haut (prefix = 'dossier/'), on revient à la racine ('')
-
-    else:
-        parent_prefix = None
-
-    return render_template('index.html', folders=folders, files=files, prefix=prefix, parent_prefix=parent_prefix)
+    return render_template('index.html', folders=folders, files=files, prefix=prefix, parent_prefix=str(key.parent))
 
 
 @bp.route('/delete', methods=['POST'])
