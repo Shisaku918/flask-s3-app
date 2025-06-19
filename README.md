@@ -59,6 +59,8 @@ AWS_REGION=eu-west-1
 
 AWS_BUCKET_NAME=nom-de-ton-bucket
 
+FLASK_SECRET_KEY=clé-de-ton-app-flask
+
 🔐 Ne pas versionner ce fichier ! Il est ignoré via .gitignore.
 
 🧪 Lancement
