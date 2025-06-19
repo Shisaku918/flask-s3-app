@@ -1,31 +1,37 @@
 from flask import Blueprint, request, render_template, redirect, url_for, flash
-from app.s3_utils import *
+from app.s3_utils import S3File, S3Directory
+import boto3
+import os
 
 bp = Blueprint('main', __name__)
+region = os.getenv("AWS_REGION")
+bucket_name = os.getenv("AWS_BUCKET_NAME")
+
+s3 = boto3.resource('s3', region_name=region)
+s3_client = boto3.client('s3', region_name=region)
+bucket = s3.Bucket(bucket_name)
+
+
+def get_s3_object(key: str) -> S3File | S3Directory:
+    if key.endswith('/'):
+        return S3Directory(key)
+    return S3File(key)
+
 
 @bp.route('/')
 def index():
-    prefix = request.args.get('prefix', '')  # récupère le dossier actuel
-    key = S3Directory(prefix)
-    folders, files = list_s3_objects(prefix)
+    prefix = request.args.get('prefix', '')  # dossier actuel
 
-    # # Pour la navigation "retour"
-    # if prefix:
-    #     parts = prefix.strip('/').split('/') #enlève les / de début et de fin et permet de sectionner les différents éléments en une liste d'éléments (chemin)
-    #     parent_prefix = '/'.join(parts[:-1]) + '/' if len(parts) > 1 else ''
-    #
-    #     # parts[:-1] prend tous les éléments sauf le dernier (le dossier courant)
-    #
-    #     # '/'.join(...) recrée un chemin
-    #
-    #     # On ajoute / à la fin pour que le préfixe reste correct pour S3
-    #
-    #     # Si on est tout en haut (prefix = 'dossier/'), on revient à la racine ('')
-    #
-    # else:
-    #     parent_prefix = None
+    dir_obj = S3Directory(prefix)
+    file_obj = S3File(prefix)
 
-    return render_template('index.html', folders=folders, files=files, prefix=prefix, parent_prefix=str(key.parent))
+    folders = dir_obj.list_folders(prefix=prefix)
+    files = file_obj.list_files(prefix=prefix)
+
+    parent_prefix = str(dir_obj.parent) if dir_obj.parent else ''
+
+    return render_template('index.html', folders=folders, files=files, prefix=prefix, parent_prefix=parent_prefix)
+
 
 
 @bp.route('/delete', methods=['POST'])
@@ -36,10 +42,10 @@ def delete():
         flash("Aucune clé spécifiée.", "error")
         return redirect(request.referrer or url_for('main.index'))
 
-    success, message = remove(key)
+    obj = get_s3_object(key)
+    success, message = obj.remove(key)
     flash(message, "success" if success else "error")
 
-    # Redirection vers le dossier parent
     parent_prefix = '/'.join(key.rstrip('/').split('/')[:-1])
     if parent_prefix:
         parent_prefix += '/'
@@ -51,10 +57,11 @@ def download():
     key = request.args.get('key')
     if not key:
         flash("Clé manquante pour téléchargement.", "error")
-        return redirect(request.referrer or url_for('index'))
+        return redirect(request.referrer or url_for('main.index'))
 
     try:
-        url = s3_client.generate_presigned_url(
+        # Génération de l'URL pré-signée via boto3 client
+        presigned_url = s3_client.generate_presigned_url(
             'get_object',
             Params={
                 'Bucket': bucket_name,
@@ -63,11 +70,11 @@ def download():
             },
             ExpiresIn=3600
         )
-        print("URL pré-signée:", url)
-        return redirect(url)
+        return redirect(presigned_url)
     except Exception as e:
         flash(f"Erreur lors de la génération du lien de téléchargement : {e}", "error")
-        return redirect(request.referrer or url_for('index'))
+        return redirect(request.referrer or url_for('main.index'))
+
 
 @bp.route('/create-folder', methods=['POST'])
 def create_folder():
@@ -78,7 +85,6 @@ def create_folder():
         flash("Nom de dossier vide.", "error")
         return redirect(request.referrer or url_for('main.index'))
 
-    # Forme finale : prefix + folder_name + /
     if prefix and not prefix.endswith('/'):
         prefix += '/'
     new_folder_key = prefix + folder_name.strip('/') + '/'
@@ -97,25 +103,19 @@ def upload():
     prefix = request.form.get('prefix', '') or ''
     files = request.files.getlist('files')
 
-    print(f"Prefix reçu : {prefix}")
-    print(f"Nombre de fichiers reçus : {len(files)}")
-
     if not files:
         return "Aucun fichier reçu", 400
 
     for file in files:
-        relative_path = file.filename  # contient le chemin relatif (ex: "monDossier/image.png")
+        relative_path = file.filename
         s3_key = prefix + relative_path
 
-        print(f"Uploading: {s3_key}")
         try:
             s3_client.upload_fileobj(file, bucket_name, s3_key)
         except Exception as e:
-            print(f"Erreur upload {file.filename} : {e}")
             return f"Erreur lors de l'upload de {file.filename} : {e}", 500
 
     return "Upload terminé", 200
-
 
 
 @bp.route('/rename', methods=['POST'])
@@ -127,10 +127,10 @@ def rename_route():
         flash("Clé source et destination requises.", "error")
         return redirect(request.referrer or url_for('main.index'))
 
-    success, msg = rename(old_key, new_key)
+    obj = get_s3_object(old_key)
+    success, msg = obj.rename(old_key, new_key)  # Passe les clés complètes
     flash(msg, "success" if success else "error")
 
-    # Rediriger vers le dossier parent du nouveau chemin
     parent_prefix = '/'.join(new_key.rstrip('/').split('/')[:-1])
     if parent_prefix:
         parent_prefix += '/'
@@ -146,6 +146,8 @@ def move_route():
         flash("Clé source ou destination manquante", "error")
         return redirect(request.referrer or url_for('main.index'))
 
-    success, message = move(old_key, new_key)
+    obj = get_s3_object(old_key)
+    success, message = obj.move(old_key, new_key)  # Passe les clés complètes
     flash(message, "success" if success else "error")
+
     return redirect(request.referrer or url_for('main.index'))
