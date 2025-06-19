@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <title>Explorateur S3</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+<div class="container">
+
+    <h1>📍 : {{ prefix or 'racine' }}</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <ul class="flash-messages">
+          {% for category, message in messages %}
+            <li class="{{ category }}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    {% if parent_prefix is not none %}
+        <p><a href="/?prefix={{ parent_prefix }}" class="back-link">Back</a></p>
+    {% endif %}
+
+    <section class="folder-create">
+        <h2>Créer un nouveau dossier ici</h2>
+        <form method="POST" action="{{ url_for('main.create_folder') }}">
+            <input type="hidden" name="prefix" value="{{ prefix or '' }}" />
+            <input class="new_folder_input" type="text" name="folder_name" placeholder="Nom du nouveau dossier" required />
+            <button type="submit">Créer</button>
+        </form>
+    </section>
+
+    <section class="folders-section">
+        <h2>Dossiers</h2>
+        <ul class="item-list">
+            {% for folder in folders %}
+              <li class="item-row">
+                  <span>📁 <a href="/?prefix={{ folder }}">{{ folder.rstrip('/').split('/')[-1] }}/</a></span>
+                  <div class="actions">
+                    <button class="move-btn" data-key="{{ (prefix or '') + folder }}">Move</button>
+                    <form method="POST" action="{{ url_for('main.delete') }}" class="inline-form">
+                      <input type="hidden" name="key" value="{{ folder }}">
+                      <button type="submit">🗑️</button>
+                    </form>
+                  </div>
+                </li>
+
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section class="files-section">
+        <h2>Fichiers</h2>
+        <ul class="item-list">
+            {% for file in files %}
+              <li class="item-row">
+                <span>📄 {{ file.split('/')[-1] }}</span>
+                <div class="actions">
+                  <a href="{{ url_for('main.download') }}?key={{ prefix + file }}">
+                      <button>Download</button>
+                  </a>
+                  <button class="rename-btn" data-key="{{ (prefix or '') + file }}">Rename</button>
+                  <button class="move-btn" data-key="{{ (prefix or '') + file }}">Move</button>
+                  <form method="POST" action="{{ url_for('main.delete') }}" class="inline-form">
+                      <input type="hidden" name="key" value="{{ prefix + file }}" />
+                      <button type="submit" class="file_delete">Delete</button>
+                  </form>
+                </div>
+              </li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section class="upload-section">
+        <h2>Uploader des fichiers ici</h2>
+        <div id="drop-zone">Glisser-déposer vos fichiers ou dossiers ici pour les uploader</div>
+    </section>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const currentPrefix = "{{ prefix or '' }}";
+
+    // Drag and drop upload
+    let filesToUpload = [];
+
+    async function traverseFileTree(item, path = "") {
+        return new Promise((resolve) => {
+            if (item.isFile) {
+                item.file(file => {
+                    file.relativePath = path + file.name;
+                    filesToUpload.push(file);
+                    resolve();
+                });
+            } else if (item.isDirectory) {
+                const dirReader = item.createReader();
+                dirReader.readEntries(async entries => {
+                    for (const entry of entries) {
+                        await traverseFileTree(entry, path + item.name + "/");
+                    }
+                    resolve();
+                });
+            }
+        });
+    }
+
+    const dropZone = document.getElementById("drop-zone");
+
+    dropZone.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        dropZone.classList.add("dragover");
+    });
+
+    dropZone.addEventListener("dragleave", () => {
+        dropZone.classList.remove("dragover");
+    });
+
+    dropZone.addEventListener("drop", async (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("dragover");
+        filesToUpload = [];
+
+        const items = e.dataTransfer.items;
+
+        for (const item of items) {
+            const entry = item.webkitGetAsEntry();
+            if (entry) {
+                await traverseFileTree(entry);
+            }
+        }
+
+        if (filesToUpload.length > 0) {
+            const formData = new FormData();
+            filesToUpload.forEach(file => {
+                formData.append("files", file, file.relativePath);
+            });
+
+            formData.append("prefix", currentPrefix);
+
+            fetch("/upload", {
+                method: "POST",
+                body: formData
+            }).then(async res => {
+                const text = await res.text();
+                if (res.ok) {
+                    alert("Upload réussi !");
+                    location.reload();
+                } else {
+                    alert("Erreur upload : " + text);
+                }
+            }).catch(err => {
+                alert("Erreur réseau : " + err);
+            });
+        } else {
+            alert("Aucun fichier détecté.");
+        }
+    });
+
+    // Rename buttons
+    document.querySelectorAll('.rename-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const oldKey = btn.getAttribute('data-key');
+            const baseName = oldKey.split('/').pop() || oldKey;
+            const newName = prompt("Nouveau nom pour cet élément :", baseName);
+            if (!newName || newName === baseName) return;
+
+            const parentPath = oldKey.substring(0, oldKey.lastIndexOf('/') + 1);
+            const newKey = parentPath + newName;
+
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = "{{ url_for('main.rename_route') }}";
+
+            const inputOld = document.createElement('input');
+            inputOld.type = 'hidden';
+            inputOld.name = 'old_key';
+            inputOld.value = oldKey;
+
+            const inputNew = document.createElement('input');
+            inputNew.type = 'hidden';
+            inputNew.name = 'new_key';
+            inputNew.value = newKey;
+
+            form.appendChild(inputOld);
+            form.appendChild(inputNew);
+            document.body.appendChild(form);
+            form.submit();
+        });
+    });
+
+    // Move buttons
+    document.querySelectorAll('.move-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const key = btn.getAttribute('data-key');
+            // Exemple: demander le nouveau chemin, puis POST pour déplacer
+            const newPrefix = prompt("Déplacer vers quel dossier ? (ex: dossier1/)", "");
+            if (!newPrefix) return;
+
+            const baseName = key.split('/').pop();
+            const newKey = newPrefix.endsWith('/') ? newPrefix + baseName : newPrefix + '/' + baseName;
+
+            // Créer un formulaire pour envoyer la requête POST de déplacement
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = "{{ url_for('main.move_route') }}"; // Remplace par la bonne route de ton serveur
+
+            const inputOld = document.createElement('input');
+            inputOld.type = 'hidden';
+            inputOld.name = 'old_key';
+            inputOld.value = key;
+
+            const inputNew = document.createElement('input');
+            inputNew.type = 'hidden';
+            inputNew.name = 'new_key';
+            inputNew.value = newKey;
+
+            form.appendChild(inputOld);
+            form.appendChild(inputNew);
+            document.body.appendChild(form);
+            form.submit();
+        });
+    });
+});
+</script>
+
+
+</body>
+</html>

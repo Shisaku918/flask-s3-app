@@ -1,0 +1,156 @@
+body {
+    background: url('https://images.unsplash.com/photo-1745929201306-5fc843dce4dc?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D') no-repeat center center fixed;
+    background-size: cover;
+    font-family: 'Poppins', sans-serif;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    color: #fff;
+    overflow-y: auto;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 30px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.01);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+a {
+    text-decoration: none;
+    color: cyan;
+}
+
+h1 {
+    font-size: 2rem;
+}
+/* Titres */
+h2 {
+    font-size: 1.5rem;
+}
+
+h1, h2 {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.folder-create {
+    text-align: center;
+}
+
+.back-link {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.25s ease;
+}
+
+
+/* Listes */
+.item-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 30px 0;
+}
+
+.item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+}
+
+.item-row:hover {
+    background: rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+}
+
+
+.item-row span,
+.item-row a {
+    flex-grow: 1;
+    overflow-wrap: anywhere;
+}
+
+/* Actions (boutons) */
+.actions {
+    display: flex;
+    gap: 8px;
+    text-align: right;
+}
+
+button, .new_folder_input, .back-link {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.25s ease;
+}
+
+button:hover, .back-link:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+button:focus, .back-link:focus {
+    outline: 2px solid #66d9ff;
+    outline-offset: 2px;
+}
+
+
+/* Drop zone */
+#drop-zone {
+    margin-top: 40px;
+    padding: 40px;
+    text-align: center;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 16px;
+    background: rgba(255, 0, 166, 0.1);
+    box-shadow: 0 0px 32px 0 rgba(255, 0, 166, 0.2);
+    backdrop-filter: blur(10px);
+    color: #ccc;
+    transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+#drop-zone.dragover {
+    background: rgba(255, 0, 166, 0.2);
+}
+
+
+.file_delete {
+    background: rgba(255, 0, 0, 0.35);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+}
+
+.file_delete:hover {
+    background: rgba(255, 0, 0, 0.55);
+}
+
+.file_delete:focus {
+    outline: 2px solid rgba(255, 0, 0, 0.55);
+}
+
+
+.flash-messages li {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    border-left: 4px solid white;
+    border-radius: 6px;
+}
+.flash-messages .error {
+    border-left-color: rgba(255, 0, 0, 0.55);
+}
