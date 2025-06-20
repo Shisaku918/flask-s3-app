@@ -1,4 +1,5 @@
 import os
 
-REGION: str = os.getenv("AWS_REGION")
-BUCKET: str = os.getenv("AWS_S3_BUCKET")
+BUCKET_NAME = os.getenv('AWS_BUCKET_NAME', 'tmp-spt')
+REGION = os.getenv('AWS_REGION', 'eu-west-1')
+

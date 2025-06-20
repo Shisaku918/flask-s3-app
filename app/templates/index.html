@@ -38,18 +38,17 @@
     <section class="folders-section">
         <h2>Dossiers</h2>
         <ul class="item-list">
-            {% for folder in folders %}
+            {% for full_key, relative_key in folders %}
               <li class="item-row">
-                  <span>📁 <a href="/?prefix={{ folder }}">{{ folder.rstrip('/').split('/')[-1] }}/</a></span>
+                  <span>📁 <a href="/?prefix={{ full_key }}">{{ relative_key.rstrip('/') }}</a></span>
                   <div class="actions">
-                    <button class="move-btn" data-key="{{ (prefix or '') + folder }}">Move</button>
+                    <button class="move-btn" data-key="{{ (prefix or '') + full_key }}">Move</button>
                     <form method="POST" action="{{ url_for('main.delete') }}" class="inline-form">
-                      <input type="hidden" name="key" value="{{ folder }}">
+                      <input type="hidden" name="key" value="{{ full_key }}">
                       <button type="submit">🗑️</button>
                     </form>
                   </div>
-                </li>
-
+              </li>
             {% endfor %}
         </ul>
     </section>
@@ -61,13 +60,13 @@
               <li class="item-row">
                 <span>📄 {{ file.split('/')[-1] }}</span>
                 <div class="actions">
-                  <a href="{{ url_for('main.download') }}?key={{ prefix + file }}">
+                  <a href="{{ url_for('main.download') }}?key={{ (prefix or '') + file }}">
                       <button>Download</button>
                   </a>
                   <button class="rename-btn" data-key="{{ (prefix or '') + file }}">Rename</button>
                   <button class="move-btn" data-key="{{ (prefix or '') + file }}">Move</button>
                   <form method="POST" action="{{ url_for('main.delete') }}" class="inline-form">
-                      <input type="hidden" name="key" value="{{ prefix + file }}" />
+                      <input type="hidden" name="key" value="{{ (prefix or '') + file }}" />
                       <button type="submit" class="file_delete">Delete</button>
                   </form>
                 </div>
@@ -208,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Créer un formulaire pour envoyer la requête POST de déplacement
             const form = document.createElement('form');
             form.method = 'POST';
-            form.action = "{{ url_for('main.move_route') }}"; // Remplace par la bonne route de ton serveur
+            form.action = "{{ url_for('main.move_route') }}";
 
             const inputOld = document.createElement('input');
             inputOld.type = 'hidden';
@@ -228,7 +227,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 </script>
-
 
 </body>
 </html>
