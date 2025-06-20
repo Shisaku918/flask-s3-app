@@ -1,5 +1,13 @@
-from typing import Self
+import zipfile
+from abc import abstractmethod
+from pathlib import Path
+from typing import ClassVar
+
+from boto3.resources.base import ServiceResource
 from dotenv import load_dotenv
+
+import config
+
 load_dotenv()
 import boto3
 import botocore
@@ -8,33 +16,66 @@ from botocore import exceptions
 
 
 class S3Key:
-    def __init__(self, path: str) -> None:
-        self.path = path
-        self.region = os.getenv("AWS_REGION")
-        self.bucket_name = os.getenv("AWS_BUCKET_NAME")
+    S3_RESOURCE: ClassVar[ServiceResource] = boto3.resource('s3', region_name=config.REGION)
+    S3_CLIENT: ClassVar['X'] = boto3.client('s3', region_name=config.REGION)
 
-        self.s3 = boto3.resource('s3', region_name=self.region)
-        self.s3_client = boto3.client('s3', region_name=self.region)
-        self.bucket = self.s3.Bucket(self.bucket_name)
+    def __init__(self, bucket_name: str, path: str) -> None:
+        self.bucket_name = bucket_name
+        self.path = path.strip('/')
 
     @property
-    def parts(self) -> list[str]:
-        return self.path.strip('/').split('/')
+    def _parts(self) -> list[str]:
+        return self.path.split('/')
 
     @property
     def parent(self) -> 'S3Directory | None':
-        if self.parts:
-            return S3Directory('/'.join(self.parts[:-1]) + '/' if len(self.parts) > 1 else '')
+        if self._parts:
+            return S3Directory(self.bucket_name, '/'.join(self._parts[:-1]) + '/' if len(self._parts) > 1 else '')
         return None
 
-    def __str__(self) -> str:
-        return self.path
+    @abstractmethod
+    def download(self, local_path: Path) -> Path:
+        raise NotImplementedError
 
+    def __str__(self) -> str:
+        return f's3://{self.bucket_name}/{self.path}'
 
 
 class S3Directory(S3Key):
+    def download(self, local_path: Path) -> Path:
+        z = self.create_zip()
+        return Path(z.filename)
+
+    def create_zip(self) -> zipfile.ZipFile:
+        pass
+
+    def list(self) -> tuple[list['S3Directory'], list['S3File']]:
+        response = self.S3_CLIENT.list_objects_v2(Bucket=self.bucket_name, Prefix=self.path, Delimiter='/')
+        folders = []
+        files = []
+        for cp in response.get('CommonPrefixes', []):
+            folders.append(S3Directory(self.bucket_name, cp['Prefix']))
+
+        # TODO: files
+
+        return folders, files
+
+    def remove(self) -> None:
+        folders, files = self.list()
+        # Supprimer tous les fichiers contenus dans le répertoire
+        for file in files:
+            file.remove()
+
+        # Supprimer tous les sous-dossiers
+        for folder in folders:
+            folder.remove()
+
+        # Maintenant que le répertoire est vide, on peut le supprimer
+        # Supprimer le répertoire
+        self.s3_client.delete_object(Bucket=self.bucket_name, Key=self.path)
+
     def list_folders(self, prefix='') -> list[S3Key]:
-        response = self.s3_client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix, Delimiter = '/')
+        response = self.s3_client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix, Delimiter='/')
         folders = []
 
         for cp in response.get('CommonPrefixes', []):
@@ -42,13 +83,23 @@ class S3Directory(S3Key):
 
         return folders
 
+    @classmethod
+    def upload(cls, local_path: Path, s3_path: str) -> 'S3Directory':
+        if local_path.is_file():
+            pass
+        else:  # local_path est un dossier
+            pass
+        s3_dir = S3Directory(s3_path)
+        return s3_dir
+
     def upload_folder(self, local_folder, s3_prefix):
         # On parcourt tout le dossier local (récursivement).
-        for root, _, files in os.walk(local_folder): # Ça parcourt tout local_folder et ses sous-dossiers. pour chaque dossier, il donne la liste des fichiers à l’intérieur.
+        for root, _, files in os.walk(
+                local_folder):  # Ça parcourt tout local_folder et ses sous-dossiers. pour chaque dossier, il donne la liste des fichiers à l’intérieur.
             # root représente le dossier en cours et files les fichiers contenus dedans
             for file in files:
                 # Chemin complet local du fichier
-                local_file = os.path.join(root, file) # tout jusqu'au dossier courant + le nom du fichier
+                local_file = os.path.join(root, file)  # tout jusqu'au dossier courant + le nom du fichier
 
                 # Chemin relatif du fichier par rapport au dossier de base
                 relative_path = os.path.relpath(local_file, local_folder)
@@ -73,7 +124,7 @@ class S3Directory(S3Key):
                 objects_to_delete = list(self.bucket.objects.filter(Prefix=key))
 
                 # Si aucun objet n'a été trouvé avec ce préfixe
-                if not objects_to_delete: # POUR LES DOSSIERS VIDES
+                if not objects_to_delete:  # POUR LES DOSSIERS VIDES
                     try:
                         # On tente de charger l'objet correspondant au "dossier" vide (clé avec '/')
                         obj = self.s3.Object(self.bucket_name, key)
@@ -130,15 +181,11 @@ class S3Directory(S3Key):
                     # sert donc simplement à donner ce qu'il y a après le préfixe source afin de copier coller directement sous la nouvelle destination.
                     copy_source = {'Bucket': self.bucket_name,
                                    'Key': obj.key}  # dico qui sert à indiquer quelle est la source à copier (quel bucket et quelle clé (chemin)
-                    self.s3.Object(self.bucket_name, new_key).copy(copy_source)  # effectue la copie en se servant de la nouvelle clé créée depuis la source
+                    self.s3.Object(self.bucket_name, new_key).copy(
+                        copy_source)  # effectue la copie en se servant de la nouvelle clé créée depuis la source
                 return f"{len(objects_to_copy)} objets copiés avec succès."
         except Exception as e:
             return f"Erreur lors de la copie : {e}"
-
-
-
-
-
 
     def rename(self, key, renamed_key):
         if key.endswith('/') and not renamed_key.endswith('/'):
@@ -153,12 +200,6 @@ class S3Directory(S3Key):
             return False, f"Copié mais erreur pendant la suppression : {msg}"
 
         return True, f"L'élément {key} a été renommé {renamed_key} avec succès !"
-
-
-
-
-
-
 
     def move(self, source_key, dest_key):
         try:
@@ -178,19 +219,18 @@ class S3Directory(S3Key):
             return False, f"Erreur pendant le déplacement : {e}"
 
 
-
-
-
 class S3File(S3Key):
     def list_files(self, prefix='') -> list[S3Key]:
         response = self.s3_client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
         files = []
 
         for obj in response.get('Contents', []):
-            key = obj['Key'] #obj est un dict donc Key renvoie la valeur associé à la clé 'Key', Key correspond au chemin, on l'extrait complètement
+            key = obj[
+                'Key']  # obj est un dict donc Key renvoie la valeur associé à la clé 'Key', Key correspond au chemin, on l'extrait complètement
             if key == prefix:
                 continue  # on ignore la "racine" elle-même, car si c'est la même pas besoin
-            relative_path = key[len(prefix):] # on enlève tout ce qu'il y a avant le nom du fichier pour ne garder que ce nom
+            relative_path = key[
+                            len(prefix):]  # on enlève tout ce qu'il y a avant le nom du fichier pour ne garder que ce nom
             if '/' not in relative_path:
                 files.append(relative_path)
 
@@ -211,23 +251,19 @@ class S3File(S3Key):
 
     def remove(self, key):
         try:
-                self.s3.Object(self.bucket_name, key).delete()
-                return True, f"Fichier supprimé avec succès : {key}"
+            self.s3.Object(self.bucket_name, key).delete()
+            return True, f"Fichier supprimé avec succès : {key}"
 
         except Exception as e:
             return False, f"Erreur lors de la suppression : {e}"
 
-
     def copy(self, source_key, dest_key):
         try:
-                copy_source = {'Bucket': self.bucket_name, 'Key': source_key}
-                self.s3.Object(self.bucket_name, dest_key).copy(copy_source)
-                return "Fichier copié avec succès."
+            copy_source = {'Bucket': self.bucket_name, 'Key': source_key}
+            self.s3.Object(self.bucket_name, dest_key).copy(copy_source)
+            return "Fichier copié avec succès."
         except Exception as e:
             return f"Erreur lors de la copie : {e}"
-
-
-
 
     def move(self, source_key, dest_key):
         try:
@@ -245,8 +281,6 @@ class S3File(S3Key):
 
         except Exception as e:
             return False, f"Erreur pendant le déplacement : {e}"
-
-
 
     def rename(self, key, renamed_key):
         if key.endswith('/') and not renamed_key.endswith('/'):
