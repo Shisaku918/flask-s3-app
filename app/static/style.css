@@ -154,3 +154,43 @@ button:focus, .back-link:focus {
 .flash-messages .error {
     border-left-color: rgba(255, 0, 0, 0.55);
 }
+
+
+
+.user-info {
+    max-width: 1014px;
+    margin: 20px auto 20px auto; /* marge verticale autour du header */
+    padding: 12px 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 50px; /* même arrondi que container */
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    color: #fff;
+    font-weight: 500;
+    font-family: 'Poppins', sans-serif;
+
+    display: flex;
+    justify-content: space-between; /* texte à gauche, bouton à droite */
+    align-items: center;
+}
+
+.user-info span {
+    font-size: 1rem;
+}
+
+.logout-link {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.25s ease;
+    font-weight: 600;
+}
+
+.logout-link:hover {
+    background: rgba(255, 255, 255, 0.3);
+}

@@ -7,6 +7,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
 </head>
 <body>
+<header class="user-info">
+  <span>Bienvenue, {{ user }} ! (Rôle : {{ role }})</span>
+  <a href="{{ url_for('main.logout') }}" class="logout-link" title="Se déconnecter">Déconnexion</a>
+</header>
 
 <div class="container">
 
@@ -22,10 +26,11 @@
       {% endif %}
     {% endwith %}
 
-    {% if parent_prefix is not none %}
-        <p><a href="/?prefix={{ parent_prefix }}" class="back-link">Back</a></p>
+    {% if parent_prefix %}
+        <p><a href="/?prefix={{ parent_prefix }}" class="back-link">← Retour</a></p>
     {% endif %}
 
+    {% if role in ['admin', 'user'] %}
     <section class="folder-create">
         <h2>Créer un nouveau dossier ici</h2>
         <form method="POST" action="{{ url_for('main.create_folder') }}">
@@ -34,6 +39,7 @@
             <button type="submit">Créer</button>
         </form>
     </section>
+    {% endif %}
 
     <section class="folders-section">
         <h2>Dossiers</h2>
@@ -42,50 +48,75 @@
               <li class="item-row">
                   <span>📁 <a href="/?prefix={{ full_key }}">{{ relative_key.rstrip('/') }}</a></span>
                   <div class="actions">
-                    <button class="move-btn" data-key="{{ (prefix or '') + full_key }}">Move</button>
+                    {% if role in ['admin', 'user'] %}
+                      <button class="move-btn" data-key="{{ full_key }}">Déplacer</button>
+                      <a href="{{ url_for('main.download', key=full_key.rstrip('/')) }}">
 
-                    <!-- Lien pour télécharger le dossier au format ZIP -->
-                    <a href="{{ url_for('main.download_zip', s3_path=((prefix or '') + full_key).rstrip('/')) }}">
-                      <button type="button">Download ZIP</button>
-                    </a>
+                        <button type="button">Télécharger ZIP</button>
+                      </a>
+                    {% else %}
+                      <a href="{{ url_for('main.download', key=full_key.rstrip('/')) }}">
 
-                    <form method="POST" action="{{ url_for('main.delete') }}" class="inline-form">
+                        <button type="button">Télécharger ZIP</button>
+                      </a>
+                    {% endif %}
+
+
+                    {% if role == 'admin' %}
+                    <form method="POST" action="{{ url_for('main.delete') }}" class="inline-form" onsubmit="return confirm('Supprimer ce dossier ?')">
                       <input type="hidden" name="key" value="{{ full_key }}">
-                      <button type="submit">🗑️</button>
+                      <button type="submit">🗑️ Supprimer</button>
                     </form>
+                    {% endif %}
                   </div>
               </li>
+            {% else %}
+              <li>Aucun dossier.</li>
             {% endfor %}
         </ul>
     </section>
-
 
     <section class="files-section">
         <h2>Fichiers</h2>
         <ul class="item-list">
-            {% for file in files %}
+            {% for full_key, relative_key in files %}
               <li class="item-row">
-                <span>📄 {{ file.split('/')[-1] }}</span>
+                <span>📄 {{ relative_key }}</span>
                 <div class="actions">
-                  <a href="{{ url_for('main.download') }}?key={{ (prefix or '') + file }}">
-                      <button>Download</button>
+                  <a href="{{ url_for('main.download') }}?key={{ full_key }}">
+                      <button>Télécharger</button>
                   </a>
-                  <button class="rename-btn" data-key="{{ (prefix or '') + file }}">Rename</button>
-                  <button class="move-btn" data-key="{{ (prefix or '') + file }}">Move</button>
-                  <form method="POST" action="{{ url_for('main.delete') }}" class="inline-form">
-                      <input type="hidden" name="key" value="{{ (prefix or '') + file }}" />
-                      <button type="submit" class="file_delete">Delete</button>
+
+                  {% if role in ['admin', 'user'] %}
+                  <button class="rename-btn" data-key="{{ full_key }}">Renommer</button>
+                  <button class="move-btn" data-key="{{ full_key }}">Déplacer</button>
+                  {% endif %}
+
+                  {% if role == 'admin' %}
+                  <form method="POST" action="{{ url_for('main.delete') }}" class="inline-form" onsubmit="return confirm('Supprimer ce fichier ?')">
+                      <input type="hidden" name="key" value="{{ full_key }}" />
+                      <button class="file_delete">Supprimer</button>
                   </form>
+                  {% endif %}
                 </div>
               </li>
+            {% else %}
+              <li>Aucun fichier.</li>
             {% endfor %}
         </ul>
     </section>
 
+    {% if role in ['admin', 'user'] %}
     <section class="upload-section">
         <h2>Uploader des fichiers ici</h2>
         <div id="drop-zone">Glisser-déposer vos fichiers ou dossiers ici pour les uploader</div>
     </section>
+    {% else %}
+    <section class="upload-section">
+        <h2>Uploader des fichiers ici</h2>
+        <p>Seuls les utilisateurs connectés peuvent uploader des fichiers.</p>
+    </section>
+    {% endif %}
 
 </div>
 
@@ -93,7 +124,8 @@
 document.addEventListener('DOMContentLoaded', () => {
     const currentPrefix = "{{ prefix or '' }}";
 
-    // Drag and drop upload
+    {% if role in ['admin', 'user'] %}
+    // Drag & Drop upload management
     let filesToUpload = [];
 
     async function traverseFileTree(item, path = "") {
@@ -204,14 +236,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.move-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const key = btn.getAttribute('data-key');
-            // Exemple: demander le nouveau chemin, puis POST pour déplacer
             const newPrefix = prompt("Déplacer vers quel dossier ? (ex: dossier1/)", "");
             if (!newPrefix) return;
 
             const baseName = key.split('/').pop();
             const newKey = newPrefix.endsWith('/') ? newPrefix + baseName : newPrefix + '/' + baseName;
 
-            // Créer un formulaire pour envoyer la requête POST de déplacement
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = "{{ url_for('main.move_route') }}";
@@ -232,6 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
             form.submit();
         });
     });
+    {% endif %}
 });
 </script>
 
