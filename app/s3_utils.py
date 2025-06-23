@@ -1,18 +1,17 @@
 from dotenv import load_dotenv
+from werkzeug.datastructures import FileStorage
+
 load_dotenv()
 
 import os
-import zipfile
 from abc import abstractmethod
 from pathlib import Path
 from typing import ClassVar
-
 import boto3
-import botocore
 from boto3.resources.base import ServiceResource
 
 import config
-import zipfile, tempfile, shutil
+import zipfile
 
 
 class S3Key:
@@ -23,12 +22,23 @@ class S3Key:
     def __init__(self, bucket_name: str, path: str) -> None:
         # Initialise un objet S3Key avec un nom de bucket et un chemin dans ce bucket
         self.bucket_name = bucket_name
-        self.path = path.strip('/')  # Nettoyage des '/' en début et fin du chemin
+        self.path = path.lstrip('/')  # Nettoyage des '/' en début et fin du chemin
+
+    @classmethod
+    def get_from_key(cls, bucket_name: str, key: str) -> 'S3Directory | S3File':
+        # Retourne un objet S3Directory ou S3File selon si la clé est un dossier ou un fichier
+        if key == '' or key.endswith('/'):
+            return S3Directory(bucket_name, key)
+        return S3File(bucket_name, key)
 
     @property
     def _parts(self) -> list[str]:
         # Retourne la liste des parties du chemin, séparées par '/'
-        return self.path.split('/')
+        return [part for part in self.path.split('/') if part]
+
+    @property
+    def name(self) -> str:
+        return self._parts[-1]
 
     @property
     def parent(self) -> 'S3Directory | None':
@@ -37,6 +47,26 @@ class S3Key:
             # Reconstruit le chemin du parent en joignant toutes les parties sauf la dernière
             return S3Directory(self.bucket_name, '/'.join(self._parts[:-1]) + '/' if len(self._parts) > 1 else '')
         return None
+
+    def relative_to(self, ancestor: 'S3Directory') -> str:
+        # Retourne le chemin relatif au dossier ancestor
+        if self.bucket_name != ancestor.bucket_name or (
+                not ancestor.is_root() and not self.path.startswith(ancestor.path)):
+            raise ValueError(f"Le répertoire {ancestor.path} n'est pas un parent de {self.path}")
+        return '/'.join(self._parts[len(ancestor._parts):])
+
+    @abstractmethod
+    def is_folder(self) -> bool:
+        # Méthode abstraite à implémenter pour savoir si l'objet est un dossier
+        raise NotImplementedError
+
+    @abstractmethod
+    def is_file(self) -> bool:
+        # Méthode abstraite à implémenter pour savoir si l'objet est un fichier
+        raise NotImplementedError
+
+    def is_root(self) -> bool:
+        return self.path == ''
 
     @abstractmethod
     def download(self, local_path: Path) -> Path:
@@ -47,18 +77,30 @@ class S3Key:
         # Représentation en format URL S3 classique
         return f's3://{self.bucket_name}/{self.path}'
 
+    def __repr__(self) -> str:
+        # Représentation en format URL S3 classique
+        return str(self)
+
 
 class S3Directory(S3Key):
+
+    def is_folder(self) -> bool:
+        return True
+
+    def is_file(self) -> bool:
+        return False
+
+    @classmethod
+    def create(cls, bucket_name: str, path: str) -> 'S3Directory':
+        cls.S3_CLIENT.put_object(Bucket=bucket_name, Key=path)
 
     def download(self, local_path: Path) -> Path:
         z = self.create_zip(local_path)
         print(f"📥 Archive téléchargée dans : {local_path}")
         return Path(z.filename)
 
-
     def create_zip(self, zip_path: Path) -> zipfile.ZipFile:
         import tempfile
-        import shutil
 
         files = self.list_all_files_recursively()
         if not files:
@@ -83,8 +125,6 @@ class S3Directory(S3Key):
         print(f"📦 Archive créée : {zip_path}")
         return zipfile.ZipFile(zip_path)
 
-
-
     def list_all_files_recursively(self) -> list[str]:
         """
         Liste récursivement tous les fichiers sous le préfixe self.path
@@ -105,10 +145,7 @@ class S3Directory(S3Key):
 
         return all_files
 
-
-
-
-    def list(self) -> tuple[list[str], list[str]]:
+    def list_content(self) -> tuple[list['S3Directory'], list['S3File']]:
         # Liste les sous-dossiers et fichiers dans ce dossier S3
         prefix = self.path
         if prefix and not prefix.endswith('/'):
@@ -125,45 +162,29 @@ class S3Directory(S3Key):
 
         # Extraire les dossiers (préfixes communs)
         for cp in response.get('CommonPrefixes', []):
-            folders.append(cp['Prefix'])
+            folders.append(S3Directory(self.bucket_name, cp['Prefix']))
         # Extraire les fichiers (clés qui ne finissent pas par '/')
         for obj in response.get('Contents', []):
             if not obj['Key'].endswith('/'):
-                files.append(obj['Key'])
+                files.append(S3File(self.bucket_name, obj['Key']))
 
         return folders, files
 
-    def remove(self) -> tuple[bool, str]:
-        # Supprime récursivement le dossier et son contenu dans S3
-        prefix = self.path.rstrip('/') + '/'
-
+    def remove(self) -> None:
+        folders, files = self.list_content()
+        for folder in folders:
+            folder.remove()
+        for file in files:
+            file.remove()
         try:
-            paginator = self.S3_CLIENT.get_paginator('list_objects_v2')
-            page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
+            self.S3_CLIENT.delete_object(Bucket=self.bucket_name, Key=self.path)
+        except self.S3_CLIENT.exceptions.NoSuchKey:
+            pass
 
-            deleted_count = 0
-            for page in page_iterator:
-                for obj in page.get('Contents', []):
-                    self.S3_CLIENT.delete_object(Bucket=self.bucket_name, Key=obj['Key'])
-                    deleted_count += 1
-
-            # Supprime les objets représentant le dossier (avec ou sans slash)
-            try:
-                self.S3_CLIENT.delete_object(Bucket=self.bucket_name, Key=prefix)
-            except self.S3_CLIENT.exceptions.NoSuchKey:
-                pass
-
-            try:
-                self.S3_CLIENT.delete_object(Bucket=self.bucket_name, Key=self.path)
-            except self.S3_CLIENT.exceptions.NoSuchKey:
-                pass
-
-            if deleted_count == 0:
-                return True, f"Dossier vide supprimé : {self.path}"
-            return True, f"{deleted_count} objets supprimés dans {self.path}"
-
-        except Exception as e:
-            return False, f"Erreur lors de la suppression du dossier {self.path} : {e}"
+    def upload_from_storage(self, files: list[FileStorage]) -> None:
+        for file in files:
+            s3_key = os.path.join(self.path, file.filename)
+            self.S3_CLIENT.upload_fileobj(file.stream, self.bucket_name, s3_key)
 
     @classmethod
     def upload(cls, local_path: Path, s3_path: str) -> 'S3Directory':
@@ -188,7 +209,7 @@ class S3Directory(S3Key):
                     cls.S3_RESOURCE.Bucket(bucket_name).upload_file(str(local_file), s3_key)
 
         # Liste les objets uploadés et affiche
-        folders, files = s3_dir.list()
+        folders, files = s3_dir.list_content()
         print(f"Upload effectué dans : s3://{bucket_name}/{s3_path}")
         print("Dossiers présents :")
         for d in folders:
@@ -198,7 +219,6 @@ class S3Directory(S3Key):
             print(f"  - {f}")
 
         return s3_dir
-
 
     def copy(self, source_key, dest_key):
         # Copie tous les objets sous source_key vers dest_key dans ce bucket
@@ -251,6 +271,24 @@ class S3Directory(S3Key):
 
 
 class S3File(S3Key):
+
+    def is_folder(self) -> bool:
+        return False
+
+    def is_file(self) -> bool:
+        return True
+
+    def get_download_url(self):
+        return self.S3_CLIENT.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': self.bucket_name,
+                'Key': self.path,
+                'ResponseContentDisposition': f'attachment; filename="{self.name}"'
+            },
+            ExpiresIn=3600
+        )
+
     def download(self, local_path: Path) -> Path:
         # Télécharge le fichier S3 vers le chemin local
         try:
@@ -261,11 +299,7 @@ class S3File(S3Key):
 
     def remove(self):
         # Supprime le fichier S3
-        try:
-            self.S3_RESOURCE.Object(self.bucket_name, self.path).delete()
-            return True, f"Fichier supprimé avec succès : {self.path}"
-        except Exception as e:
-            return False, f"Erreur lors de la suppression : {e}"
+        self.S3_CLIENT.delete_object(Bucket=self.bucket_name, Key=self.path)
 
     def copy(self, source_key, dest_key):
         # Copie un fichier d'un chemin source à un chemin destination dans le bucket
@@ -293,6 +327,3 @@ class S3File(S3Key):
             return False, f"Erreur pendant la copie : {copy_result}"
 
         return self.remove()
-
-
-

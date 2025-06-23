@@ -10,7 +10,7 @@
 
 <div class="container">
 
-    <h1>📍 : {{ prefix or 'racine' }}</h1>
+    <h1>📍 : {{ directory.path or 'racine' }}</h1>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -22,14 +22,14 @@
       {% endif %}
     {% endwith %}
 
-    {% if parent_prefix is not none %}
-        <p><a href="/?prefix={{ parent_prefix }}" class="back-link">Back</a></p>
+    {% if directory.parent %}
+        <p><a href="/?prefix={{ directory.parent.path }}" class="back-link">Back</a></p>
     {% endif %}
 
     <section class="folder-create">
         <h2>Créer un nouveau dossier ici</h2>
         <form method="POST" action="{{ url_for('main.create_folder') }}">
-            <input type="hidden" name="prefix" value="{{ prefix or '' }}" />
+            <input type="hidden" name="prefix" value="{{ directory.path }}" />
             <input class="new_folder_input" type="text" name="folder_name" placeholder="Nom du nouveau dossier" required />
             <button type="submit">Créer</button>
         </form>
@@ -38,19 +38,19 @@
     <section class="folders-section">
         <h2>Dossiers</h2>
         <ul class="item-list">
-            {% for full_key, relative_key in folders %}
+            {% for folder in folders %}
               <li class="item-row">
-                  <span>📁 <a href="/?prefix={{ full_key }}">{{ relative_key.rstrip('/') }}</a></span>
+                  <span>📁 <a href="/?prefix={{ folder.path }}">{{ folder.relative_to(directory) }}</a></span>
                   <div class="actions">
-                    <button class="move-btn" data-key="{{ (prefix or '') + full_key }}">Move</button>
+                    <button class="move-btn" data-key="{{ folder.path }}">Move</button>
 
                     <!-- Lien pour télécharger le dossier au format ZIP -->
-                    <a href="{{ url_for('main.download_zip', s3_path=((prefix or '') + full_key).rstrip('/')) }}">
-                      <button type="button">Download ZIP</button>
+                    <a href="{{ url_for('main.download', key=folder.path) }}">
+                      <button type="button">Download</button>
                     </a>
 
                     <form method="POST" action="{{ url_for('main.delete') }}" class="inline-form">
-                      <input type="hidden" name="key" value="{{ full_key }}">
+                      <input type="hidden" name="key" value="{{ folder.path }}">
                       <button type="submit">🗑️</button>
                     </form>
                   </div>
@@ -65,15 +65,15 @@
         <ul class="item-list">
             {% for file in files %}
               <li class="item-row">
-                <span>📄 {{ file.split('/')[-1] }}</span>
+                <span>📄 {{ file.name }}</span>
                 <div class="actions">
-                  <a href="{{ url_for('main.download') }}?key={{ (prefix or '') + file }}">
+                  <a href="{{ url_for('main.download', key=file.path) }}">
                       <button>Download</button>
                   </a>
-                  <button class="rename-btn" data-key="{{ (prefix or '') + file }}">Rename</button>
-                  <button class="move-btn" data-key="{{ (prefix or '') + file }}">Move</button>
+                  <button class="rename-btn" data-key="{{ file.path }}">Rename</button>
+                  <button class="move-btn" data-key="{{ file.path }}">Move</button>
                   <form method="POST" action="{{ url_for('main.delete') }}" class="inline-form">
-                      <input type="hidden" name="key" value="{{ (prefix or '') + file }}" />
+                      <input type="hidden" name="key" value="{{ file.path }}" />
                       <button type="submit" class="file_delete">Delete</button>
                   </form>
                 </div>
@@ -91,7 +91,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    const currentPrefix = "{{ prefix or '' }}";
+    const currentPrefix = "{{ directory.path or '' }}";
 
     // Drag and drop upload
     let filesToUpload = [];
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.move-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const key = btn.getAttribute('data-key');
-            // Exemple: demander le nouveau chemin, puis POST pour déplacer
+            // Exemple : demander le nouveau chemin, puis POST pour déplacer
             const newPrefix = prompt("Déplacer vers quel dossier ? (ex: dossier1/)", "");
             if (!newPrefix) return;
 
