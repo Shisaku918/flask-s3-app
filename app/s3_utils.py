@@ -12,6 +12,7 @@ import botocore
 from boto3.resources.base import ServiceResource
 
 import config
+import zipfile, tempfile, shutil
 
 
 class S3Key:
@@ -50,13 +51,62 @@ class S3Key:
 class S3Directory(S3Key):
 
     def download(self, local_path: Path) -> Path:
-        # Télécharge le dossier en créant une archive zip (non implémentée)
-        z = self.create_zip()
+        z = self.create_zip(local_path)
+        print(f"📥 Archive téléchargée dans : {local_path}")
         return Path(z.filename)
 
-    def create_zip(self) -> zipfile.ZipFile:
-        # Devrait créer un zip du contenu du dossier (non implémentée)
-        raise NotImplementedError("create_zip() n'est pas encore implémentée.")
+
+    def create_zip(self, zip_path: Path) -> zipfile.ZipFile:
+        import tempfile
+        import shutil
+
+        files = self.list_all_files_recursively()
+        if not files:
+            raise ValueError(f"Aucun fichier à zipper dans {self.path}")
+
+        temp_dir = Path(tempfile.mkdtemp())
+
+        for s3_key in files:
+            relative_path = Path(s3_key).relative_to(self.path)
+            local_file_path = temp_dir / relative_path
+            local_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+            self.S3_RESOURCE.Bucket(self.bucket_name).download_file(s3_key, str(local_file_path))
+
+        zip_path.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file_path in temp_dir.rglob('*'):
+                if file_path.is_file():
+                    arcname = file_path.relative_to(temp_dir)
+                    zipf.write(file_path, arcname)
+
+        print(f"📦 Archive créée : {zip_path}")
+        return zipfile.ZipFile(zip_path)
+
+
+
+    def list_all_files_recursively(self) -> list[str]:
+        """
+        Liste récursivement tous les fichiers sous le préfixe self.path
+        """
+        prefix = self.path
+        if prefix and not prefix.endswith('/'):
+            prefix += '/'
+
+        paginator = self.S3_CLIENT.get_paginator('list_objects_v2')
+        page_iterator = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
+
+        all_files = []
+        for page in page_iterator:
+            for obj in page.get('Contents', []):
+                key = obj['Key']
+                if not key.endswith('/'):  # Ignore les "pseudo-dossiers"
+                    all_files.append(key)
+
+        return all_files
+
+
+
 
     def list(self) -> tuple[list[str], list[str]]:
         # Liste les sous-dossiers et fichiers dans ce dossier S3
@@ -243,3 +293,6 @@ class S3File(S3Key):
             return False, f"Erreur pendant la copie : {copy_result}"
 
         return self.remove()
+
+
+

@@ -43,6 +43,12 @@
                   <span>📁 <a href="/?prefix={{ full_key }}">{{ relative_key.rstrip('/') }}</a></span>
                   <div class="actions">
                     <button class="move-btn" data-key="{{ (prefix or '') + full_key }}">Move</button>
+
+                    <!-- Lien pour télécharger le dossier au format ZIP -->
+                    <a href="{{ url_for('main.download_zip', s3_path=((prefix or '') + full_key).rstrip('/')) }}">
+                      <button type="button">Download ZIP</button>
+                    </a>
+
                     <form method="POST" action="{{ url_for('main.delete') }}" class="inline-form">
                       <input type="hidden" name="key" value="{{ full_key }}">
                       <button type="submit">🗑️</button>
@@ -52,6 +58,7 @@
             {% endfor %}
         </ul>
     </section>
+
 
     <section class="files-section">
         <h2>Fichiers</h2>

@@ -1,3 +1,5 @@
+import tempfile
+
 from flask import Blueprint, request, render_template, redirect, url_for, flash, send_file
 from app.s3_utils import S3File, S3Directory
 import boto3
@@ -69,6 +71,25 @@ def delete():
     if parent:
         parent = parent.rstrip('/') + '/'
     return redirect(url_for('main.index', prefix=parent))
+
+
+@bp.route("/download_zip/<path:s3_path>")
+def download_zip(s3_path):
+    try:
+        s3_dir = S3Directory(config.BUCKET_NAME, s3_path)
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            zip_path = Path(tmpdirname) / f"{Path(s3_path).name or 'archive'}.zip"
+            s3_dir.download(zip_path)
+            return send_file(
+                zip_path,
+                as_attachment=True,
+                download_name=zip_path.name,
+                mimetype='application/zip'
+            )
+    except Exception as e:
+        flash(f"Erreur lors du téléchargement : {e}", "danger")
+        return redirect(url_for("index"))  # rediriger vers la page d'accueil ou listing
+
 
 
 @bp.route('/download')
