@@ -2,8 +2,8 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Connexion - Explorateur S3</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <title>Changer le nom d'utilisateur - Explorateur S3</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet" />
   <style>
     body {
       background: url('https://images.unsplash.com/photo-1745929201306-5fc843dce4dc?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D') no-repeat center center fixed;
@@ -18,7 +18,7 @@
       justify-content: center;
     }
 
-    .login-container {
+    .change-container {
       background: rgba(255, 255, 255, 0.05);
       padding: 40px;
       border-radius: 20px;
@@ -41,6 +41,7 @@
       display: flex;
       flex-direction: column;
       gap: 16px;
+      margin-top: 20px;
     }
 
     input {
@@ -58,32 +59,18 @@
     }
 
     button {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #fff;
-    padding: 12px;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.3s ease;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #fff;
+      padding: 12px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s ease;
     }
 
-    button:hover, .back-link:hover {
-        background: rgba(255, 255, 255, 0.2);
-    }
-
-    .link-group {
-      margin-top: 20px;
-      font-size: 0.9rem;
-    }
-
-    .link-group a {
-      color: cyan;
-      text-decoration: none;
-    }
-
-    .link-group a:hover {
-      text-decoration: underline;
+    button:hover {
+      background: rgba(255, 255, 255, 0.2);
     }
 
     .flash-messages {
@@ -100,8 +87,8 @@
   </style>
 </head>
 <body>
-  <div class="login-container">
-    <h1>Connexion</h1>
+  <div class="change-container">
+    <h1>Changer le nom d'utilisateur</h1>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -113,15 +100,13 @@
       {% endif %}
     {% endwith %}
 
-    <form method="POST" action="{{ url_for('main.login') }}">
-      <input type="text" name="username" placeholder="Nom d'utilisateur" required>
-      <input type="password" name="password" placeholder="Mot de passe" required>
-      <button type="submit">Se connecter</button>
+    <form method="POST" action="{{ url_for('main.change_username') }}">
+      <input type="text" name="new_username" placeholder="Nouveau nom d'utilisateur" required />
+      <button type="submit">Changer le nom d'utilisateur</button>
     </form>
 
-    <div class="link-group">
-      <p>Pas encore de compte ? <a href="{{ url_for('main.register') }}">Créer un compte</a></p>
-      <p><a href="{{ url_for('main.index') }}">🔍 Visiter en tant qu'invité</a></p>
+    <div style="margin-top: 20px;">
+      <a href="{{ url_for('main.index') }}" style="color: cyan; text-decoration: none;">Retour à l'accueil</a>
     </div>
   </div>
 </body>

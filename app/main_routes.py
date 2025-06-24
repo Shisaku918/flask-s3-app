@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 from pathlib import Path
@@ -12,7 +13,7 @@ from werkzeug.utils import secure_filename
 from app.s3_utils import S3Key, S3Directory, S3File
 from app.auth_utils import (
     verify_user, create_session, get_username_from_session,
-    delete_session, get_user_role, create_user
+    delete_session, get_user_role, create_user, create_admin, delete_user, redis_client
 )
 import config
 
@@ -20,6 +21,12 @@ bp = Blueprint('main', __name__)
 
 bucket_name = os.getenv("AWS_BUCKET_NAME", config.BUCKET_NAME)
 region = os.getenv("AWS_REGION", config.REGION)
+
+@bp.before_app_request
+def require_login():
+    allowed_routes = ['main.login', 'static']  # autorise login et fichiers statiques
+    if 'session_token' not in session and request.endpoint not in allowed_routes:
+        return redirect(url_for('main.login'))
 
 
 def get_s3_object(key: str) -> S3Key:
@@ -86,6 +93,187 @@ def register():
     return render_template('register.html')
 
 
+@bp.route('/register-admin', methods=['GET', 'POST'])
+@role_required(['admin'])
+def register_admin():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        if create_admin(username, password):
+            flash("Administrateur créé avec succès", "success")
+            return redirect(url_for('main.index'))
+
+        flash("Nom d'utilisateur déjà utilisé", "danger")
+    return render_template('register-admin.html', registering_admin=True)
+
+
+
+@bp.route('/manage-users')
+@role_required(['admin'])
+def manage_users():
+    # Récupère tous les utilisateurs (stockés en hash sous la clé 'users')
+    raw = redis_client.hgetall('users') or {}
+    users = []
+    for username_bytes, data_bytes in raw.items():
+        # 1) Décoder la clé (username)
+        username = username_bytes.decode('utf-8') if isinstance(username_bytes, (bytes, bytearray)) else username_bytes
+        # 2) Décoder la valeur et parser le JSON
+        try:
+            data_str = data_bytes.decode('utf-8') if isinstance(data_bytes, (bytes, bytearray)) else data_bytes
+            data = json.loads(data_str)
+        except Exception:
+            data = {'role': 'user'}
+        users.append({
+            'username': username,
+            'role': data.get('role', 'user')
+        })
+        # Trier : admins en premier
+        users.sort(key=lambda u: 0 if u['role'] == 'admin' else 1)
+
+    return render_template('manage_users.html', users=users)
+
+
+@bp.route('/delete-user', methods=['POST'])
+@role_required(['admin'])
+def delete_user():
+    username = request.form.get('username')
+    if username:
+        # Supprimer de Redis
+        redis_client.hdel('users', username)
+        flash(f"Utilisateur {username} supprimé.", "success")
+    return redirect(url_for('main.manage_users'))
+
+@bp.route('/promote-user', methods=['POST'])
+@role_required(['admin'])
+def promote_user():
+    username = request.form.get('username')
+    data = redis_client.hget('users', username)
+    if data:
+        user_data = json.loads(data)
+        user_data['role'] = 'admin'
+        redis_client.hset('users', username, json.dumps(user_data))
+        flash(f"Utilisateur {username} promu admin.", "success")
+    return redirect(url_for('main.manage_users'))
+
+
+
+
+@bp.route('/delete-account', methods=['GET', 'POST'])
+def delete_account():
+    token = session.get('session_token')
+    if not token:
+        return redirect(url_for('main.login'))
+
+    username = get_username_from_session(token)
+    if not username:
+        return redirect(url_for('main.login'))
+
+    if request.method == 'POST':
+        # Supprime l'utilisateur de Redis
+        redis_client.hdel('users', username)
+        delete_session(token)
+        session.clear()
+        flash("Votre compte a été supprimé.", "success")
+        return redirect(url_for('main.login'))
+
+    # GET : afficher confirmation
+    return render_template('confirm_delete_account.html', username=username)
+
+
+
+
+
+
+@bp.route('/change-password', methods=['GET', 'POST'])
+def change_password():
+    token = session.get('session_token')
+    if not token:
+        return redirect(url_for('main.login'))
+
+    username = get_username_from_session(token)
+    if not username:
+        return redirect(url_for('main.login'))
+
+    if request.method == 'POST':
+        old_password = request.form.get('old_password')
+        new_password = request.form.get('new_password')
+        confirm_password = request.form.get('confirm_password')
+
+        if not verify_user(username, old_password):
+            flash("Ancien mot de passe incorrect.", "error")
+        elif new_password != confirm_password:
+            flash("Les nouveaux mots de passe ne correspondent pas.", "error")
+        else:
+            # Met à jour le mot de passe
+            from app.auth_utils import hash_password  # si pas déjà importé
+            hashed_pw, salt = hash_password(new_password)
+            user_data_json = redis_client.hget('users', username)
+            if not user_data_json:
+                abort(404)
+
+            user_data = json.loads(user_data_json.decode('utf-8') if isinstance(user_data_json, bytes) else user_data_json)
+            user_data['password'] = f"{hashed_pw}:{salt}"
+            redis_client.hset('users', username, json.dumps(user_data))
+            flash("Mot de passe mis à jour avec succès.", "success")
+            return redirect(url_for('main.index'))
+
+    return render_template('change_password.html', username=username)
+
+
+
+
+
+
+
+
+
+@bp.route('/change-username', methods=['GET', 'POST'])
+def change_username():
+    token = session.get('session_token')
+    if not token:
+        return redirect(url_for('main.login'))
+
+    current_username = get_username_from_session(token)
+    if not current_username:
+        return redirect(url_for('main.login'))
+
+    if request.method == 'POST':
+        new_username = request.form.get('new_username')
+
+        if not new_username:
+            flash("Veuillez entrer un nouveau nom d'utilisateur.", "error")
+        elif redis_client.hexists('users', new_username):
+            flash("Ce nom d'utilisateur est déjà pris.", "error")
+        else:
+            # Récupère les données du compte actuel
+            user_data_json = redis_client.hget('users', current_username)
+            if not user_data_json:
+                abort(404)
+
+            # Ajoute nouveau username + supprime l'ancien
+            redis_client.hset('users', new_username, user_data_json)
+            redis_client.hdel('users', current_username)
+
+            # Met à jour la session
+            delete_session(token)
+            new_token = create_session(new_username)
+            session['session_token'] = new_token
+
+            flash(f"Nom d'utilisateur changé avec succès : {new_username}", "success")
+            return redirect(url_for('main.index'))
+
+    return render_template('change_username.html', current_username=current_username)
+
+
+
+
+
+
+
+
+
+
 @bp.route('/')
 def index():
     user = get_current_user()
@@ -124,18 +312,6 @@ def index():
         parent_prefix=parent_prefix,
         folders=folders_for_template,
         files=files_for_template
-    )
-
-
-    return render_template(
-        'index.html',
-        content=content,
-        user=user,
-        role=role,
-        folders=folders_for_template,
-        files=files_for_template,
-        prefix=prefix,
-        parent_prefix=parent_prefix
     )
 
 

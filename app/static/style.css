@@ -92,14 +92,17 @@ h1, h2 {
     text-align: right;
 }
 
+
+
 button, .new_folder_input, .back-link {
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
     color: #fff;
-    padding: 6px 12px;
-    border-radius: 8px;
+    padding: 12px;
+    border-radius: 10px;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.25s ease;
+    transition: background 0.3s ease;
 }
 
 button:hover, .back-link:hover {
@@ -131,16 +134,16 @@ button:focus, .back-link:focus {
 }
 
 
-.file_delete {
+.file_delete, .delete_account_button {
     background: rgba(255, 0, 0, 0.35);
     box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
 }
 
-.file_delete:hover {
+.file_delete:hover, .delete_account_button:hover {
     background: rgba(255, 0, 0, 0.55);
 }
 
-.file_delete:focus {
+.file_delete:focus, .delete_account_button:focus {
     outline: 2px solid rgba(255, 0, 0, 0.55);
 }
 

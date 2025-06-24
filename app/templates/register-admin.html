@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Connexion - Explorateur S3</title>
+  <title>Créer un compte - Explorateur S3</title>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
   <style>
     body {
@@ -18,7 +18,7 @@
       justify-content: center;
     }
 
-    .login-container {
+    .register-container {
       background: rgba(255, 255, 255, 0.05);
       padding: 40px;
       border-radius: 20px;
@@ -58,18 +58,18 @@
     }
 
     button {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #fff;
-    padding: 12px;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.3s ease;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #fff;
+      padding: 10px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s ease;
     }
 
-    button:hover, .back-link:hover {
-        background: rgba(255, 255, 255, 0.2);
+    button:hover {
+      background: rgba(255, 255, 255, 0.3);
     }
 
     .link-group {
@@ -100,8 +100,8 @@
   </style>
 </head>
 <body>
-  <div class="login-container">
-    <h1>Connexion</h1>
+  <div class="register-container">
+    <h1>Créer un compte (admin)</h1>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -113,15 +113,14 @@
       {% endif %}
     {% endwith %}
 
-    <form method="POST" action="{{ url_for('main.login') }}">
+    <form method="POST" action="{{ url_for('main.register_admin') }}">
       <input type="text" name="username" placeholder="Nom d'utilisateur" required>
       <input type="password" name="password" placeholder="Mot de passe" required>
-      <button type="submit">Se connecter</button>
+      <button type="submit">Créer un admin</button>
     </form>
 
     <div class="link-group">
-      <p>Pas encore de compte ? <a href="{{ url_for('main.register') }}">Créer un compte</a></p>
-      <p><a href="{{ url_for('main.index') }}">🔍 Visiter en tant qu'invité</a></p>
+      <p>Déjà un compte ? <a href="{{ url_for('main.login') }}">Connexion</a></p>
     </div>
   </div>
 </body>

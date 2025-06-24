@@ -118,6 +118,34 @@
     </section>
     {% endif %}
 
+    {% if role == 'admin' %}
+        <h2 style="margin: 20px; margin-top: 50px;">Outils d'administration</h2>
+      <section class="admin-tools" style="display: flex; justify-content: center;">
+        <a href="{{ url_for('main.register_admin') }}" style="margin: 10px;">
+          <button type="button">➕ Créer un nouvel admin</button>
+        </a>
+        <a href="{{ url_for('main.manage_users') }}" style="margin: 10px;">
+          <button type="button">Gestion des utilisateurs</button>
+        </a>
+      </section>
+    {% endif %}
+
+    {% if role in ['admin', 'user'] %}
+        <h2 style="margin: 20px;">Gestion de votre compte</h2>
+        <section class="gestion" style="display: flex; justify-content: center;">
+            <a href="{{ url_for('main.delete_account') }}">
+              <button type="button" class="delete_account_button" style="margin: 10px;">Supprimer votre compte</button>
+            </a>
+            <a href="{{ url_for('main.change_password') }}" style="margin: 10px;">
+              <button type="button">Changer votre mot de passe</button>
+            </a>
+            <a href="{{ url_for('main.change_username') }}" style="margin: 10px;">
+              <button type="button">Changer votre identifiant</button>
+            </a>
+        </section>
+    {% endif %}
+
+
 </div>
 
 <script>

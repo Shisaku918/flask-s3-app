@@ -2,8 +2,8 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
-  <title>Connexion - Explorateur S3</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <title>Confirmer la suppression de compte - Explorateur S3</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet" />
   <style>
     body {
       background: url('https://images.unsplash.com/photo-1745929201306-5fc843dce4dc?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D') no-repeat center center fixed;
@@ -18,7 +18,7 @@
       justify-content: center;
     }
 
-    .login-container {
+    .confirm-container {
       background: rgba(255, 255, 255, 0.05);
       padding: 40px;
       border-radius: 20px;
@@ -40,50 +40,32 @@
     form {
       display: flex;
       flex-direction: column;
-      gap: 16px;
-    }
-
-    input {
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: none;
-      outline: none;
-      background: rgba(255, 255, 255, 0.15);
-      color: #fff;
-      font-size: 1rem;
-    }
-
-    input::placeholder {
-      color: #ccc;
+      gap: 20px;
+      margin-top: 20px;
     }
 
     button {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #fff;
-    padding: 12px;
-    border-radius: 10px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background 0.3s ease;
+      background: rgba(255, 0, 0, 0.6);
+      border: none;
+      color: #fff;
+      padding: 12px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s ease;
     }
 
-    button:hover, .back-link:hover {
-        background: rgba(255, 255, 255, 0.2);
+    button:hover {
+      background: rgba(255, 0, 0, 0.85);
     }
 
-    .link-group {
-      margin-top: 20px;
-      font-size: 0.9rem;
+    .cancel-btn {
+      background: rgba(255, 255, 255, 0.2);
+      color: #fff;
     }
 
-    .link-group a {
-      color: cyan;
-      text-decoration: none;
-    }
-
-    .link-group a:hover {
-      text-decoration: underline;
+    .cancel-btn:hover {
+      background: rgba(255, 255, 255, 0.4);
     }
 
     .flash-messages {
@@ -100,8 +82,8 @@
   </style>
 </head>
 <body>
-  <div class="login-container">
-    <h1>Connexion</h1>
+  <div class="confirm-container">
+    <h1>Confirmer la suppression du compte</h1>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -113,16 +95,15 @@
       {% endif %}
     {% endwith %}
 
-    <form method="POST" action="{{ url_for('main.login') }}">
-      <input type="text" name="username" placeholder="Nom d'utilisateur" required>
-      <input type="password" name="password" placeholder="Mot de passe" required>
-      <button type="submit">Se connecter</button>
+    <p>Êtes-vous sûr de vouloir supprimer définitivement le compte <strong>{{ username }}</strong> ?</p>
+
+    <form method="POST" action="{{ url_for('main.delete_account') }}">
+      <button type="submit">Oui, supprimer mon compte</button>
     </form>
 
-    <div class="link-group">
-      <p>Pas encore de compte ? <a href="{{ url_for('main.register') }}">Créer un compte</a></p>
-      <p><a href="{{ url_for('main.index') }}">🔍 Visiter en tant qu'invité</a></p>
-    </div>
+    <form method="GET" action="{{ url_for('main.index') }}">
+      <button type="submit" class="cancel-btn">Non, revenir à l'accueil</button>
+    </form>
   </div>
 </body>
 </html>

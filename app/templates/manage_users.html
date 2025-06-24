@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <title>Gestion des utilisateurs</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+<header class="user-info">
+  <span>Bienvenue, {{ user }} ! (Rôle : {{ role }})</span>
+  <a href="{{ url_for('main.logout') }}" class="logout-link">Déconnexion</a>
+</header>
+<div class="container">
+  <h1>📋 Gestion des utilisateurs</h1>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flash-messages">
+        {% for category, message in messages %}
+          <li class="{{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+
+  {% if users %}
+    <table style="width:100%; border-collapse: collapse; margin-top:20px;">
+      <thead>
+        <tr>
+          <th style="text-align:left; padding:8px;">Utilisateur</th>
+          <th style="text-align:left; padding:8px;">Rôle</th>
+          <th style="text-align:center; padding:8px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr style="border-top:1px solid rgba(255,255,255,0.2);">
+          <td style="padding:8px;">{{ u.username }}</td>
+          <td style="padding:8px;">{{ u.role }}</td>
+          <td style="padding:8px; text-align:center;">
+            <!-- bouton suppression utilisateur -->
+            <form method="POST" action="{{ url_for('main.delete_user') }}" style="display:inline-block;">
+              <input type="hidden" name="username" value="{{ u.username }}">
+              <button type="submit" class="file_delete" onclick="return confirm('Supprimer l’utilisateur {{ u.username }} ?');">
+                🗑️
+              </button>
+            </form>
+            <!-- bouton promotion/demotion admin -->
+            {% if u.role != 'admin' %}
+            <form method="POST" action="{{ url_for('main.promote_user') }}" style="display:inline-block; margin-left:8px;">
+              <input type="hidden" name="username" value="{{ u.username }}">
+              <button type="submit">🔼 Admin</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>Aucun utilisateur trouvé.</p>
+  {% endif %}
+
+  <p style="margin-top:20px;"><a href="{{ url_for('main.index') }}">← Retour à l’explorateur</a></p>
+</div>
+</body>
+</html>

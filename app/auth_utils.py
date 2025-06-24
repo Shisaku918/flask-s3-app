@@ -30,6 +30,18 @@ def create_user(username: str, password: str, role: str = 'user') -> bool:
     return True
 
 
+def create_admin(username: str, password: str) -> bool:
+    """Crée un compte administrateur. Échoue si l'utilisateur existe déjà."""
+    if redis_client.hexists('users', username):
+        return False
+
+    hashed_pw, salt = hash_password(password)
+    user_data = {
+        'password': f"{hashed_pw}:{salt}",
+        'role': 'admin'  # rôle forcé
+    }
+    redis_client.hset('users', username, json.dumps(user_data))
+    return True
 
 
 
@@ -88,3 +100,9 @@ def current_user_role():
         return 'guest'
     role = get_user_role(username)
     return role or 'guest'
+
+def delete_user(username: str) -> bool:
+    if redis_client.hexists('users', username):
+        redis_client.hdel('users', username)
+        return True
+    return False
