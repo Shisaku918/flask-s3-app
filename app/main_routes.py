@@ -26,7 +26,7 @@ region = os.getenv("AWS_REGION", config.REGION)
 
 @bp.before_app_request
 def require_login():
-    allowed_routes = ['main.login', 'static']  # autorise login et fichiers statiques
+    allowed_routes = ['main.login', 'static', 'main.register', 'main.index']  # autorise login et fichiers statiques
     if 'session_token' not in session and request.endpoint not in allowed_routes:
         return redirect(url_for('main.login'))
 
@@ -328,34 +328,27 @@ def index():
     )
 
 
-
-
-
 @bp.route('/upload', methods=['POST'])
-@role_required(['admin', 'user'])
 def upload():
+    # Upload un ou plusieurs fichiers via formulaire sous un prefix donné
     prefix = request.form.get('prefix', '').strip('/')
     files = request.files.getlist('files')
 
-    if not files:
+    if not files or all(f.filename == '' for f in files):
         flash("Aucun fichier reçu.", "error")
         return redirect(request.referrer or url_for('main.index'))
 
-    s3dir = S3Directory(bucket_name, prefix)
-    safe_files = []
-    for f in files:
-        f.filename = secure_filename(f.filename)
-        if f.filename:
-            safe_files.append(f)
+    directory = S3Directory(bucket_name, prefix)
 
     try:
-        s3dir.upload_from_storage(safe_files)
-        log_action(get_current_user(), f"Upload de fichiers dans {prefix or '/'} : {[f.filename for f in safe_files]}")
+        directory.upload_from_storage(files)
         flash("Upload terminé avec succès.", "success")
+        log_action(get_current_user(), f"Upload de fichiers dans '{prefix or '/'}' : {[f.filename for f in files]}")
     except Exception as e:
         flash(f"Erreur lors de l'upload : {e}", "error")
+        log_action(get_current_user(), f"Échec de l'upload dans '{prefix or '/'}' : {str(e)}")
 
-    return redirect(url_for('main.index', prefix=prefix + '/' if prefix else ''))
+    return redirect(url_for('main.index', prefix=prefix))
 
 
 

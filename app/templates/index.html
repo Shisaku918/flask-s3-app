@@ -26,23 +26,26 @@
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        <ul class="flash-messages">
+        <div class="flash-messages">
           {% for category, message in messages %}
-            <li class="{{ category }}">{{ message }}</li>
+            <div class="alert alert-{{ category }}">
+              {{ message }}
+            </div>
           {% endfor %}
-        </ul>
+        </div>
       {% endif %}
     {% endwith %}
 
+
     {% if role in ['admin', 'user'] %}
-    <section class="folder-create">
-        <h2>Créer un nouveau dossier ici</h2>
-        <form method="POST" action="{{ url_for('main.create_folder') }}">
-            <input type="hidden" name="prefix" value="{{ prefix or '' }}" />
-            <input class="new_folder_input" type="text" name="folder_name" placeholder="Nom du nouveau dossier" required />
-            <button type="submit">Créer</button>
-        </form>
-    </section>
+        <section class="folder-create">
+            <h2>Créer un nouveau dossier ici</h2>
+            <form method="POST" action="{{ url_for('main.create_folder') }}">
+                <input type="hidden" name="prefix" value="{{ prefix or '' }}" />
+                <input class="new_folder_input" type="text" name="folder_name" placeholder="Nom du nouveau dossier" required />
+                <button type="submit">Créer</button>
+            </form>
+        </section>
     {% endif %}
 
     <section class="folders-section">
@@ -111,14 +114,14 @@
     </section>
 
     {% if role in ['admin', 'user'] %}
-    <section class="upload-section">
-        <h2>Uploader des fichiers ici</h2>
-        <div id="drop-zone">Glisser-déposer vos fichiers ou dossiers ici pour les uploader</div>
-    </section>
+        <section class="upload-section">
+            <h2>Uploader des fichiers ici</h2>
+            <div id="drop-zone">Glisser-déposer vos fichiers ou dossiers ici pour les uploader</div>
+        </section>
     {% else %}
     <section class="upload-section">
         <h2>Uploader des fichiers ici</h2>
-        <p>Seuls les utilisateurs connectés peuvent uploader des fichiers.</p>
+        <p style="display: flex; justify-content: center;">Seuls les utilisateurs connectés peuvent uploader des fichiers.</p>
     </section>
     {% endif %}
 
