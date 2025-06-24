@@ -518,43 +518,47 @@ def view_logs():
 
 
 
+from flask_login import current_user
+from flask import make_response
+
 @bp.route('/logs-global')
 @role_required(['admin'])
 def view_global_logs():
-    # Récupère tous les utilisateurs
     raw_users = redis_client.hkeys('users') or []
     all_logs = []
 
     for username_bytes in raw_users:
-        username = username_bytes.encode('utf-8') if isinstance(username_bytes, (bytes, bytearray)) else username_bytes
+        username = username_bytes.decode('utf-8') if isinstance(username_bytes, bytes) else username_bytes
         log_key = f"logs:{username}"
         logs_raw = redis_client.lrange(log_key, 0, -1)
         for entry in logs_raw:
-            log = json.loads(entry.encode('utf-8'))
+            log = json.loads(entry.decode('utf-8') if isinstance(entry, bytes) else entry)
             ts = log.get('timestamp')
             log['formatted_ts'] = ts.replace('T', ' ')[:19] if ts else '-'
             log['username'] = username
-            # Récupérer le rôle de l'utilisateur
             user_data_json = redis_client.hget('users', username)
             user_data = {}
             if user_data_json:
                 try:
-                    user_data = json.loads(user_data_json.encode('utf-8') if isinstance(user_data_json, bytes) else user_data_json)
+                    user_data = json.loads(user_data_json.decode('utf-8') if isinstance(user_data_json, bytes) else user_data_json)
                 except:
                     user_data = {}
             log['role'] = user_data.get('role', 'user')
             all_logs.append(log)
 
-    # Trier les logs par timestamp décroissant (nouveaux d'abord)
     all_logs.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
 
-    return render_template(
-        "logs_global.html",
+    response = make_response(render_template(
+        'logs_global.html',
         logs=all_logs,
-        username=username,
-        is_admin='admin',
-        viewing_own_logs=view_logs
-    )
+        is_admin=True,
+        viewing_own_logs=False
+    ))
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
 
 
 
@@ -578,3 +582,17 @@ def clear_logs():
         flash(f"Erreur lors de la suppression des logs : {e}", "error")
 
     return redirect(url_for('main.view_logs', user=target_user))
+
+
+
+
+@bp.route('/clear_logs_global', methods=['POST'])
+@role_required(['admin'])
+def clear_logs_global():
+    raw_users = redis_client.hkeys('users') or []
+    for username_bytes in raw_users:
+        username = username_bytes.decode('utf-8') if isinstance(username_bytes, bytes) else username_bytes
+        log_key = f"logs:{username}"
+        redis_client.delete(log_key)
+    flash("Tous les logs globaux ont été supprimés.", "success")
+    return redirect(url_for('main.view_global_logs'))

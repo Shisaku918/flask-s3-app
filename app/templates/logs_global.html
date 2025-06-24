@@ -78,19 +78,17 @@
     <h1>📜 Journal d'activité</h1>
 
     <div class="user-label">
-      {{ "Logs de " + username if is_admin else "Vos activités récentes" }}
+      Journal global
     </div>
 
 
-    {% if is_admin %}
-        <form method="POST" action="{{ url_for('main.clear_logs') }}" style="display:inline;">
-            <input type="hidden" name="username" value="{{ username }}">
-            <button type="submit" onclick="return confirm('Êtes-vous sûr de vouloir supprimer tous les logs de cet utilisateur ?')"
-                    class="btn btn-danger">
-                Nettoyer les logs
-            </button>
-        </form>
-    {% endif %}
+
+    <form method="POST" action="{{ url_for('main.clear_logs_global') }}" style="display:inline;">
+        <button type="submit" onclick="return confirm('Êtes-vous sûr de vouloir supprimer tous les logs globaux ?')" class="btn btn-danger">
+            Nettoyer tous les logs globaux
+        </button>
+    </form>
+
 
     {% if logs %}
     <table class="table">
