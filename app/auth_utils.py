@@ -82,24 +82,25 @@ def delete_session(session_token: str):
     redis_client.delete(f"session:{session_token}")
 
 
-def get_user_role(username: str) -> str | None:
-    import json
+def get_user_role(username):
+    if not username:
+        return None
     data = redis_client.hget('users', username)
     if not data:
         return None
-    user_data = json.loads(data)
-    return user_data.get('role')
+    user_info = json.loads(data)
+    return user_info.get('role')
 
 
 def current_user_role():
-    session_token = session.get('session_token')
-    if not session_token:
-        return 'guest'  # Pas connecté = invité
-    username = get_username_from_session(session_token)
+    token = session.get('session_token')
+    if not token:
+        return 'guest'
+    username = get_username_from_session(token)
     if not username:
         return 'guest'
-    role = get_user_role(username)
-    return role or 'guest'
+    return get_user_role(username) or 'guest'
+
 
 def delete_user(username: str) -> bool:
     if redis_client.hexists('users', username):
