@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Journal d’activité</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background: url('https://images.unsplash.com/photo-1745929201306-5fc843dce4dc?q=80&w=1074&auto=format&fit=crop') no-repeat center center fixed;
+      background-size: cover;
+      font-family: 'Poppins', sans-serif;
+      color: #fff;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+    }
+
+    .container {
+      backdrop-filter: blur(12px);
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      border-radius: 20px;
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 30px;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      color: #fff;
+    }
+
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      text-align: left;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .back-link {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 10px 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 10px;
+      color: #fff;
+      text-decoration: none;
+      transition: background 0.3s ease;
+    }
+
+    .back-link:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .user-label {
+      text-align: center;
+      font-weight: 600;
+      margin-bottom: 10px;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📜 Journal d'activité</h1>
+
+    <div class="user-label">
+      {{ "Logs de " + username if is_admin else "Vos activités récentes" }}
+    </div>
+
+
+    {% if is_admin %}
+    <form method="POST" action="{{ url_for('main.clear_logs') }}" style="display:inline;">
+        <input type="hidden" name="username" value="{{ username }}">
+        <button type="submit" onclick="return confirm('Êtes-vous sûr de vouloir supprimer tous les logs de cet utilisateur ?')"
+                class="btn btn-danger">
+            Nettoyer les logs
+        </button>
+    </form>
+    {% endif %}
+
+    {% if logs %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Action</th>
+                {% if not viewing_own_logs %}
+                <th>Utilisateur</th>
+                <th>Rôle</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.formatted_ts }}</td>
+                <td>{{ log.action }}</td>
+                {% if not viewing_own_logs %}
+                <td>{{ log.username }}</td>
+                <td>{{ log.role }}</td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
+
+
+    {% else %}
+      <p>Aucune activité enregistrée.</p>
+    {% endif %}
+
+
+
+    <a href="{{ url_for('main.index') }}" class="back-link">← Retour à l’explorateur</a>
+  </div>
+</body>
+</html>

@@ -131,6 +131,10 @@
         <a href="{{ url_for('main.manage_users') }}" style="margin: 10px;">
           <button type="button">Gestion des utilisateurs</button>
         </a>
+        <a href="{{ url_for('main.view_global_logs') }}" style="margin: 10px;">
+            <button type="button">Voir journal global</button>
+        </a>
+
       </section>
     {% endif %}
 
@@ -145,6 +149,9 @@
             </a>
             <a href="{{ url_for('main.change_username') }}" style="margin: 10px;">
               <button type="button">Changer votre identifiant</button>
+            </a>
+            <a href="{{ url_for('main.view_logs') }}" style="margin: 10px;">
+              <button type="button">Voir mon journal</button>
             </a>
         </section>
     {% endif %}
