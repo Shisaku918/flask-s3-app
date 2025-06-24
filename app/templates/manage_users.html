@@ -5,6 +5,23 @@
     <title>Gestion des utilisateurs</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      .admin-button {
+        margin-bottom: 20px;
+        padding: 10px 16px;
+        font-weight: 600;
+        background: rgba(255,255,255,0.1);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 10px;
+        color: #fff;
+        cursor: pointer;
+        transition: background 0.3s ease;
+      }
+
+      .admin-button:hover {
+        background: rgba(255,255,255,0.2);
+      }
+    </style>
 </head>
 <body>
 <header class="user-info">
@@ -61,6 +78,19 @@
   {% else %}
     <p>Aucun utilisateur trouvé.</p>
   {% endif %}
+
+    <a href="{{ url_for('main.register') }}" style="text-decoration: none;">
+      <button type="button" class="admin-button">
+        ➕ Créer un utilisateur
+      </button>
+    </a>
+
+    <a href="{{ url_for('main.register_admin') }}" style="text-decoration: none; margin: 10px;">
+      <button type="button" class="admin-button">
+        ➕ Créer un admin
+      </button>
+    </a>
+
 
   <p style="margin-top:20px;"><a href="{{ url_for('main.index') }}">← Retour à l’explorateur</a></p>
 </div>

@@ -14,6 +14,14 @@
 
 <div class="container">
 
+
+    {% if prefix %}
+      <a href="{{ url_for('main.index', prefix=parent_prefix) }}" style="text-decoration: none;">
+        <button type="button" style="margin-bottom: 20px;">⬅️ Retour</button>
+      </a>
+    {% endif %}
+
+
     <h1>📍 : {{ prefix or 'racine' }}</h1>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -25,10 +33,6 @@
         </ul>
       {% endif %}
     {% endwith %}
-
-    {% if parent_prefix %}
-        <p><a href="/?prefix={{ parent_prefix }}" class="back-link">← Retour</a></p>
-    {% endif %}
 
     {% if role in ['admin', 'user'] %}
     <section class="folder-create">
@@ -65,7 +69,7 @@
                     {% if role == 'admin' %}
                     <form method="POST" action="{{ url_for('main.delete') }}" class="inline-form" onsubmit="return confirm('Supprimer ce dossier ?')">
                       <input type="hidden" name="key" value="{{ full_key }}">
-                      <button type="submit">🗑️ Supprimer</button>
+                      <button type="submit" class="file_delete">Supprimer</button>
                     </form>
                     {% endif %}
                   </div>
