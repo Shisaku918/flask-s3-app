@@ -23,10 +23,34 @@ class S3Key(ABC):
 
     @classmethod
     def get_from_key(cls, bucket_name: str, key: str) -> Union['S3Directory', 'S3File']:
-        """Retourne un objet S3Directory ou S3File selon la clé."""
-        if key == '' or key.endswith('/'):
-            return S3Directory(bucket_name, key)
-        return S3File(bucket_name, key)
+        # D'abord, test si c'est un fichier exact
+        try:
+            cls.S3_CLIENT.head_object(Bucket=bucket_name, Key=key)
+            return S3File(bucket_name, key)
+        except cls.S3_CLIENT.exceptions.ClientError as e:
+            if e.response['Error']['Code'] != '404':
+                raise
+
+        # Ensuite, regarde s’il existe un "dossier" avec ce préfixe (i.e., objets avec ce préfixe + slash)
+        if not key.endswith('/'):
+            key_with_slash = key + '/'
+        else:
+            key_with_slash = key
+
+        response = cls.S3_CLIENT.list_objects_v2(
+            Bucket=bucket_name,
+            Prefix=key_with_slash,
+            MaxKeys=1
+        )
+
+        if 'Contents' in response:
+            return S3Directory(bucket_name, key_with_slash)
+
+        raise FileNotFoundError(f"Aucun fichier ou dossier trouvé pour la clé : {key}")
+
+    @property
+    def key(self):
+        return self.path
 
     @property
     def _parts(self) -> List[str]:
@@ -45,13 +69,11 @@ class S3Key(ABC):
             parent_path += '/'
         return S3Directory(self.bucket_name, parent_path)
 
-    @abstractmethod
-    def is_folder(self) -> bool:
-        ...
+    def is_folder(self):
+        return isinstance(self, S3Directory)
 
-    @abstractmethod
-    def is_file(self) -> bool:
-        ...
+    def is_file(self):
+        return isinstance(self, S3File)
 
     def is_root(self) -> bool:
         return self.path == ''
