@@ -397,23 +397,22 @@ def delete():
 @bp.route('/download')
 def download():
     key = request.args.get('key')
-    if not key.endswith('/'):
-        key += '/'
     if not key:
         flash("Clé manquante pour téléchargement.", "error")
         return redirect(request.referrer or url_for('main.index'))
 
-    obj = get_s3_object(key)
+    obj = get_s3_object(key)  # Ne modifie pas la clé ici
 
     try:
         if obj.is_folder():
             # Dossier => zip et download
             tmp_dir = tempfile.TemporaryDirectory()
             zip_path = (Path(tmp_dir.name) / (obj.name or "archive")).with_suffix(".zip")
-            obj.download(zip_path)
-            response = send_file(zip_path, as_attachment=True)
-            # TemporaryDirectory will be cleaned up automatically on close
-            return response
+
+            if not obj.download(zip_path):
+                flash(f"Aucun fichier dans {obj.key} à zipper", "error")
+                return redirect(request.referrer or url_for('main.index'))
+
             log_action(get_current_user(), f"Téléchargement du dossier {obj}")
             return send_file(zip_path, as_attachment=True)
 
@@ -423,9 +422,6 @@ def download():
             return redirect(obj.get_download_url())
 
         else:
-            url = obj.get_download_url()
-            return redirect(url)
-            # Cas ambigus
             flash("Objet non reconnu comme fichier ou dossier.", "error")
             return redirect(request.referrer or url_for('main.index'))
 
