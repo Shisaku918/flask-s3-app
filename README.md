@@ -88,3 +88,5 @@ flask-s3-app/
 ├── requirements.txt
 └── README.md
 ```
+
+PS : Lorsque vous créer un dossier un fichier temporaire du même nom apparaît pour faire en sorte que le dossier "existe" car la librairie ne connaît pas vraiment le concept de fichier et de dossier, pour elle un dossier vide est simplement quelque chose qui n'existe pas. Si après avoir upload quoique ce soit dans ce dossier alors que l'upload abouti je vous invite à supprimer ce fichier temporaire et à revenir sur le dossier (cela forcera l'affichage de vos uploads).
