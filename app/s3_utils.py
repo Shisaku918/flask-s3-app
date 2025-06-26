@@ -23,6 +23,10 @@ class S3Key(ABC):
 
     @classmethod
     def get_from_key(cls, bucket_name: str, key: str) -> Union['S3Directory', 'S3File']:
+        
+        if key == '':
+            return S3Directory(bucket_name, '')
+        # D'abord, test si c'est un fichier exact
         # D'abord, test si c'est un fichier exact
         try:
             cls.S3_CLIENT.head_object(Bucket=bucket_name, Key=key)
